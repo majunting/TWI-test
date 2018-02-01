@@ -45,16 +45,16 @@
 
 #include "mcc_generated_files/mcc.h"
 
-void CAN_TRANSMISSION();
 uint32_t Read_Data();
 
-uint8_t Data_H = 0x0, Data_M = 0x0, Data_L = 0x0;
 /*
                          Main application
  */
 void main(void)
 {
     uint32_t count;
+    uint8_t Data_H, Data_M, Data_L;
+    
     // Initialize the device
     SYSTEM_Initialize();
 
@@ -85,16 +85,29 @@ void main(void)
 
     // Disable the Peripheral Interrupts
     //INTERRUPT_PeripheralInterruptDisable();
-    
-    TMR0_SetInterruptHandler(&CAN_TRANSMISSION);
 
     while (1)
     {
         // Add your application code
-        count = Read_Data();
-        Data_H = count >> 16;
-        Data_M = count >> 8;
-        Data_L = count;
+        if(TMR2_GetTransmit()){
+            count = Read_Data();
+            Data_H = count >> 16;
+            Data_M = count >> 8;
+            Data_L = count;
+
+            uCAN_MSG Message;
+
+            Message.frame.idType = dSTANDARD_CAN_MSG_ID_2_0B;
+            Message.frame.id = 0x0;
+            Message.frame.dlc = 3;
+            Message.frame.data0 = Data_H;
+            Message.frame.data1 = Data_M;
+            Message.frame.data2 = Data_L;
+
+            CAN_transmit(&Message);
+            TMR2_ClearTransmit();
+            INTERRUPT_PeripheralInterruptEnable();
+        }
     }
 }
 
@@ -115,19 +128,6 @@ uint32_t Read_Data(){
     count = count ^ 0x800000;
     ADSK = 0;
     return count;
-}
-
-void CAN_TRANSMISSION(){
-    uCAN_MSG Message;
-    
-    Message.frame.idType = dSTANDARD_CAN_MSG_ID_2_0B;
-    Message.frame.id = 0x0;
-    Message.frame.dlc = 3;
-    Message.frame.data0 = Data_H;
-    Message.frame.data1 = Data_M;
-    Message.frame.data2 = Data_L;
-    
-    CAN_transmit(&Message);
 }
 /**
  End of File
